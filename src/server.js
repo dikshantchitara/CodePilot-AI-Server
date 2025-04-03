@@ -21,6 +21,52 @@ const wss = new WebSocketServer({ server });
 app.use(cors());
 app.use(express.json());
 
+// Add root route handler
+app.get('/', (req, res) => {
+    res.send(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>CodeCraft AI Backend</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f5f5f5;
+          }
+          .container {
+            text-align: center;
+            padding: 2rem;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          }
+          .status {
+            color: #4CAF50;
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+          }
+          .info {
+            color: #666;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>CodeCraft AI Backend</h1>
+          <div class="status">✅ Server is running</div>
+          <p class="info">Server Time: ${new Date().toLocaleString()}</p>
+          <p class="info">Environment: ${process.env.NODE_ENV || 'development'}</p>
+        </div>
+      </body>
+    </html>
+  `);
+});
+
 const WORKSPACE_DIR = join(__dirname, '..', 'workspace');
 const activeProcesses = new Map();
 
