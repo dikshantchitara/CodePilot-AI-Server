@@ -67,7 +67,9 @@ app.get('/', (req, res) => {
   `);
 });
 
-const WORKSPACE_DIR = join(__dirname, '..', 'workspace');
+const WORKSPACE_DIR = process.env.NODE_ENV === 'production'
+    ? '/tmp/workspace'
+    : join(__dirname, '..', 'workspace');
 const activeProcesses = new Map();
 
 // Ensure workspace directory exists
