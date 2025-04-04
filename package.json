@@ -4,10 +4,13 @@
   "description": "Backend for AI-powered code sandbox",
   "main": "src/server.js",
   "type": "module",
+  "engines": {
+    "node": ">=18.x"
+  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "vercel-build": "echo hello"
   },
   "keywords": [
     "ai",
