@@ -8,6 +8,7 @@ import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
 import { google } from 'googleapis';
 import { config } from 'dotenv';
+import { storage } from './utils/storage.js';
 
 config();
 
@@ -72,12 +73,8 @@ const WORKSPACE_DIR = process.env.NODE_ENV === 'production'
     : join(__dirname, '..', 'workspace');
 const activeProcesses = new Map();
 
-// Ensure workspace directory exists
-try {
-    await fs.mkdir(WORKSPACE_DIR, { recursive: true });
-} catch (error) {
-    console.error('Error creating workspace directory:', error);
-}
+// Initialize storage on server start
+await storage.initialize();
 
 // Function to kill a process and its children
 const killProcess = async (pid) => {
@@ -223,84 +220,38 @@ wss.on('connection', (ws) => {
 app.get('/api/files/list', async (req, res) => {
     try {
         const { path = '' } = req.query;
-        // Remove any leading slashes and workspace references from the path
-        const cleanPath = path.replace(/^\/+/, '').replace(/^workspace\/+/, '');
-        const targetPath = join(WORKSPACE_DIR, cleanPath);
-
-        // Ensure the target path is within the workspace directory
-        if (!targetPath.startsWith(WORKSPACE_DIR)) {
-            return res.status(403).json({ error: 'Access denied: Path is outside workspace' });
-        }
-
-        const files = await fs.readdir(targetPath, { withFileTypes: true });
-        const fileList = await Promise.all(files.map(async (file) => {
-            const filePath = join(targetPath, file.name);
-            const stats = await fs.stat(filePath);
-            return {
-                name: file.name,
-                path: filePath.replace(WORKSPACE_DIR, '').replace(/\\/g, '/'),
-                type: file.isDirectory() ? 'directory' : 'file',
-                size: stats.size,
-                modified: stats.mtime
-            };
-        }));
-        res.json(fileList);
+        const files = await storage.listFiles(path);
+        res.json(files);
     } catch (error) {
         console.error('Error listing files:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-app.get('/api/files/read', async (req, res) => {
-    try {
-        // Remove any leading slashes and workspace references from the path
-        const cleanPath = (req.query.path || '').replace(/^\/+/, '').replace(/^workspace\/+/, '');
-        const filePath = join(WORKSPACE_DIR, cleanPath);
-
-        // Ensure the target path is within the workspace directory
-        if (!filePath.startsWith(WORKSPACE_DIR)) {
-            return res.status(403).json({ error: 'Access denied: Path is outside workspace' });
-        }
-
-        const content = await fs.readFile(filePath, 'utf-8');
-        res.json({ content });
-    } catch (error) {
-        console.error('Error reading file:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
 app.post('/api/files/write', async (req, res) => {
     try {
-        // Remove any leading slashes and workspace references from the path
-        const cleanPath = req.body.path.replace(/^\/+/, '').replace(/^workspace\/+/, '');
-        const filePath = join(WORKSPACE_DIR, cleanPath);
-
-        // Ensure the target path is within the workspace directory
-        if (!filePath.startsWith(WORKSPACE_DIR)) {
-            return res.status(403).json({ error: 'Access denied: Path is outside workspace' });
-        }
-
-        await fs.writeFile(filePath, req.body.content, 'utf-8');
-        res.json({ success: true });
+        const { path, content } = req.body;
+        const result = await storage.writeFile(path, content);
+        res.json({ success: true, result });
     } catch (error) {
         console.error('Error writing file:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-app.delete('/api/files/delete', async (req, res) => {
+app.get('/api/files/read/:path(*)', async (req, res) => {
     try {
-        // Remove any leading slashes and workspace references from the path
-        const cleanPath = req.body.path.replace(/^\/+/, '').replace(/^workspace\/+/, '');
-        const targetPath = join(WORKSPACE_DIR, cleanPath);
+        const content = await storage.readFile(req.params.path);
+        res.send(content);
+    } catch (error) {
+        console.error('Error reading file:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
-        // Ensure the target path is within the workspace directory
-        if (!targetPath.startsWith(WORKSPACE_DIR)) {
-            return res.status(403).json({ error: 'Access denied: Path is outside workspace' });
-        }
-
-        await deleteDirectory(targetPath);
+app.delete('/api/files/:path(*)', async (req, res) => {
+    try {
+        await storage.deleteFile(req.params.path);
         res.json({ success: true });
     } catch (error) {
         console.error('Error deleting file:', error);
